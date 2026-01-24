@@ -2,11 +2,13 @@ import os
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer
 
+
 # parser
 d = {"and": "&", "AND": "&",
      "or": "|", "OR": "|",
      "not": "1 -", "NOT": "1 -",
      "(": "(", ")": ")"}
+
 
 def load_documents(filename):
     __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
@@ -17,8 +19,10 @@ def load_documents(filename):
         documents = [' '.join(doc.strip().split("\n")[1:]) for doc in documents]
         return documents
 
+
 def rewrite_token(t):
     return d.get(t, 'td_matrix[t2i["{:s}"]]'.format(t))
+
 
 def rewrite_query(query, t2i, td_matrix):
     tokens = query.split()
@@ -32,6 +36,7 @@ def rewrite_query(query, t2i, td_matrix):
             parts.append(f'get_term_vector("{t.lower()}", t2i, td_matrix)')
     return "(" + " ".join(parts) + ")"
 
+
 def test_query(query,t2i,td_matrix):
     print("Query: '" + query + "'")
     print("Rewritten:", rewrite_query(query,t2i,td_matrix))
@@ -42,6 +47,7 @@ def print_doc_snippet(doc):
     words = doc.split()
     return " ".join(words[:50]) + " ..."
 
+
 def get_term_vector(term, t2i, td_matrix):
     #Returns zero vector (no matches) for unknown terms
     term = term.lower()
@@ -51,7 +57,6 @@ def get_term_vector(term, t2i, td_matrix):
         return np.zeros(td_matrix.shape[1], dtype=bool)
 
 def search_tool(t2i,td_matrix,documents):
-    
     print()
     print("*Boolean search tool*")
     print("(Enter empty line to stop.)")
@@ -68,8 +73,6 @@ def search_tool(t2i,td_matrix,documents):
         print("...")
         
         rewritten = rewrite_query(query,t2i,td_matrix)
-
-       
         
         hits_vector = eval(rewritten, {
             "td_matrix": td_matrix,
@@ -79,15 +82,12 @@ def search_tool(t2i,td_matrix,documents):
             "__builtins__": {}
         })
         hits_vector = np.asarray(hits_vector).ravel().astype(bool)
-
         hits_list = np.where(hits_vector)[0]
-
         count = len(hits_list)
         print(f"Found {count} matching document(s)")
         if count == 0:
             print()
             continue
-       
        
         #Show top 5 matches
         n = 5
@@ -99,12 +99,12 @@ def search_tool(t2i,td_matrix,documents):
             print(print_doc_snippet(documents[doc_idx]))
             print()
 
+
 def main():
     #Load the document
     print('Loading the document: "1000 articles extracted from English Wikipedia..."')
     filename = "enwiki-20181001-corpus.1000-articles.txt"
     documents = load_documents(filename)
-
     
     cv = CountVectorizer(lowercase=True, binary=True)
     sparse_matrix = cv.fit_transform(documents)
@@ -122,6 +122,7 @@ def main():
     print(f"Done! Vocabulary size: {len(terms)}")
 
     search_tool(t2i,td_matrix,documents)
+
 
 if __name__ == "__main__":
     main()
