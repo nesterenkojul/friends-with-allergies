@@ -28,5 +28,5 @@ source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install numpy scikit-learn
 
-##Run
+## Run
 python3 boolean_search_stem_exact.py
