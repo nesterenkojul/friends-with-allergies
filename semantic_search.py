@@ -25,11 +25,21 @@ def semantic_search(query, query_embedding, documents, doc_embeddings):
     # Output results, print 5 most relevant results
     print(f"Showing 5 most relevant matches:")
     print()
-    for i, doc_idx in enumerate(ranked_doc_indices[:6]):
-        print(f"Doc #{i} (score: {cosine_similarities[doc_idx]:.4f})")
+    shown = 1
+    i = 1
+    while shown < 6:
+        doc_idx = ranked_doc_indices[i]
+        i += 1
+        if not documents[doc_idx].strip():
+            continue
+
+        print(f"Doc #{shown} (score: {cosine_similarities[doc_idx]:.4f})")
         print(print_doc_snippet(documents[doc_idx]))
         print()
 
+        shown += 1
+ 
+            
     
 def main():
     #Load and embed the document
@@ -40,12 +50,17 @@ def main():
     doc_embeddings = model.encode(documents)
 
     # Query input
-    query = input("Please enter the query: ")
-    print()
-    query_embedding = model.encode(query)
+    while True:
+        query = input("Please enter the query (Enter to exit): ")
+        if query == "":
+            print("Good bye!!!")
+            break
+        else:
+            print()
+            query_embedding = model.encode(query)
 
-    # Perfoming semantic search
-    semantic_search(query, query_embedding, documents, doc_embeddings)
+            # Perfoming semantic search
+            semantic_search(query, query_embedding, documents, doc_embeddings)
 
 
 if __name__ == "__main__":
