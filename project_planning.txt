@@ -1,0 +1,19 @@
+Friends with allergies - Project plan
+
+Introduction:
+What if you have severe allergies and have been tired of finding out which restaurant is safe to eat in?
+What if you are on a diet and have no idea which restaurant offers the right food?
+What if you are just not knowing what to eat?
+
+FriendsWithAllergies is here to help! FWA is an application targeted at people with allergies or dietary restrictions to find suitable and allergy-free restaurants across Helsinki(Finland). We scrape the location, menu and reviews from the website Quandoo, and go further and deeper than that. It is impossible to find suitable restaurants based on allergies or dietary preferences, or give you close-to-heart daily food recommendations. 
+
+Our application fills in the gap and offers more than that! You can search based on your diet restrictions and distance from your location, read the restaurant reviews and get inspirations or recommendations if they have trouble deciding what to eat based on the weather, mood, location, etc. (Hopefully)
+  
+
+Features:
+1. Support Boolean, TF/IDF and neural search
+2. Data visualization for recommended restaurants based on relevance and distance (hopefully)
+3. Food and restaurant recommendations based on queries (Hopefully)
+
+Installation
+(Coming soon)
