@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Friends with allergies</title>
+    <style>
+        body {
+            background-image: url('dropback.avif');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            background-repeat: no-repeat;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            padding: 50px;
+        }
+
+        h1 {
+            display: inline-block;
+            color: #d63384;
+            background-color: #d1d3d280;
+            padding: 10px 10px;
+            font-size: 3em;
+        }
+
+        form {
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            display: inline-block;
+            margin-top: 20px;
+        }
+
+        input[type="text"] {
+            width: 250px;
+            padding: 7px;
+            border: 2px solid #d1d3d280;
+            border-radius: 1px;
+            font-size: 1em;
+            margin-right: 1px;
+        }
+
+        button {
+            background-color: #ff69b4;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        button:hover {
+            background-color: #d63384;
+        }
+    </style>
+</head>
+<body>
+<section>
+    <header>
+    	<h1>Friends with allergies</h1>
+    </header>
+    
+    <nav>
+        <button id="boolean" onclick="myFunction2()">Boolean Search</button>
+        <button id="tf-idf" onclick="myFunction2()">TF-IDF Search</button>
+        <button id="semantic" onclick="myFunction1()">Semantic Search</button>
+ 	</nav>
+    
+    <article>
+        <div id="semanticsearch">
+        <input type="text" name="user_input" placeholder="What to eat!">
+        <form action="/process" method="post">
+        	<button type="submit">Search</button>
+    	</form>
+        </div>
+
+        <div id="boolean-tf-idf-search">
+        <input type="text" name="user_input" placeholder="Red flag: Don't include!">
+        <form action="/process" method="post">
+        	<button type="submit">Search</button>
+    	</form>
+
+        <input type="text" name="user_input" placeholder="Green flag: I want this!">
+        <form action="/process" method="post">
+        	<button type="submit">Search</button>
+    	</form>
+        </div>
+    </article>
+</section>	
+    <script>
+function myFunction1() {
+  var x = document.getElementById("semanticsearch");
+  var y = document.getElementById("boolean-tf-idf-search");
+  var z = document.getElementById("semantic");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+    y.style.display = "none";
+    z.style.backgroundColor = "#d63384";
+  } else {
+    x.style.display = "none";
+    y.style.display = "block";
+    z.style.backgroundColor = "#ff69b4";
+  }
+}
+
+function myFunction2() {
+  var x = document.getElementById("boolean-tf-idf-search");
+  var y = document.getElementById("semanticsearch");
+  if (x.style.display === "none") {
+    x.style.display = "block";
+    y.style.display = "none";
+  } else {
+    x.style.display = "none";
+    y.style.display = "block";
+  }
+}
+</script>
+
+
+</body>
+</html>
