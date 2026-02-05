@@ -1,0 +1,8 @@
+pandas
+requests
+beautifulsoup4
+nltk
+scikit-learn
+flask
+translators
+sentence_transformers
