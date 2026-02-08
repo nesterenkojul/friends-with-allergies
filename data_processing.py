@@ -6,6 +6,7 @@ import translators as ts
 from math import inf
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sentence_transformers import SentenceTransformer
+nltk.download('wordnet')
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
 lemmatizer = nltk.wordnet.WordNetLemmatizer()
@@ -99,7 +100,8 @@ def get_term_vector(term, t2i, td_matrix):
 
 
 def boolean_search(query_yes, query_no, documents):
-    if not (query_yes and query_no):
+    # to make it more rubust when users only give one query.
+    if not (query_yes or query_no): 
         return []
     if query_yes:
         transl_query_yes = translate_chunk(query_yes)
@@ -114,7 +116,7 @@ def boolean_search(query_yes, query_no, documents):
     if query_yes and query_no:
         min_ngram_size = min(min_ngram_size_yes, min_ngram_size_no)
         max_ngram_size = max(max_ngram_size_yes, max_ngram_size_no)
-        rewritten = f"({rewritten_yes}) & (1 – ({rewritten_no}))"
+        rewritten = f"({rewritten_yes}) & (1 - ({rewritten_no}))"
 
     cv = CountVectorizer(lowercase=True, binary=True, preprocessor=extract_lemmas, ngram_range=(min_ngram_size, max_ngram_size))
     sparse_matrix = cv.fit_transform(documents)
@@ -152,7 +154,8 @@ def get_tf_idf_scores(query, documents):
  
 
 def tf_idf_search(query_yes, query_no, documents):
-    if not (query_yes and query_no):
+    # to make it more rubust when users only give one query.
+    if not (query_yes or query_no):
         return []
     if query_yes:
         ids_and_scores_yes = get_tf_idf_scores(query_yes, documents)
