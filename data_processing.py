@@ -1,5 +1,6 @@
 import os
 import nltk
+from nltk.sentiment import SentimentIntensityAnalyzer
 import numpy as np
 import pandas as pd
 import translators as ts
@@ -7,8 +8,10 @@ from math import inf
 from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 from sentence_transformers import SentenceTransformer
 nltk.download('wordnet')
+nltk.download('vader_lexicon')
 
 model = SentenceTransformer('all-MiniLM-L6-v2')
+sia = SentimentIntensityAnalyzer()
 lemmatizer = nltk.wordnet.WordNetLemmatizer()
 N = 10  # How many top matches to show
 
@@ -175,13 +178,73 @@ def tf_idf_search(query_yes, query_no, documents):
     return fitting_restaurants
 
 
-def semantic_search(query, documents, doc_embeddings):
+def semantic_search(query, documents, doc_embeddings,threshold=0.25):
     query_embedding = model.encode(query)
     cosine_similarities = np.dot(query_embedding, doc_embeddings.T)
     ranked_doc_indices = np.argsort(cosine_similarities)[::-1]
 
     fitting_restaurants = []
-    for i in range(N):
+    best_similarity = cosine_similarities[ranked_doc_indices[0]]
+    if best_similarity < threshold:
+        return []
+
+    for i in range(len(documents)):
+        if len(fitting_restaurants) >= N:
+            break
         doc_idx = ranked_doc_indices[i]
+        similarity = cosine_similarities[doc_idx]
+        if similarity < threshold:
+            break
         fitting_restaurants.append(documents[doc_idx].split('\n')[0])
+
     return fitting_restaurants
+
+
+def sentiment_analysis(text):
+    #Input a text and use sentiment analysis to output if the review is negative (0) or positive (1)
+    score = sia.polarity_scores(text)["compound"]
+    return 1 if score >= 0 else 0
+
+
+def get_all_allergy_reviews(all_reviews,similarity_threshold=0.3):
+    #Extract all allergy-related reviews from all the review of a restaurant and return them in a list
+    doc_embeddings = model.encode(all_reviews)
+    allergy_query = """
+    allergy allergic reaction anaphylaxis hypersensitivity
+    gluten celiac
+    dairy lactose
+    food intolerance sensitivity dietary restrictions
+    cross-contamination epinephrine EpiPen stomach ache, diarrhea """
+
+    allergy_reviews_with_scores = semantic_search(
+        query=allergy_query,
+        documents=all_reviews,
+        doc_embeddings=doc_embeddings,
+        similarity_threshold=similarity_threshold
+    )
+    allergy_reviews = [item['review'] for item in allergy_reviews_with_scores]
+    return allergy_reviews
+
+
+def allergy_reviews_analyser(all_reviews,similarity_threshold=0.3):
+    # Classify the allergy reviews into positive or negative
+    # => Calculate the proportion of positive/total allergy reviews => the larger this proportion, the better result
+    allergy_reviews = get_all_allergy_reviews(all_reviews,similarity_threshold)
+
+    positive_count = 0
+    negative_count = 0
+
+    for review in allergy_reviews:
+        sentiment_score = sentiment_analysis(review)
+        if sentiment_score == 1:
+            positive_count += 1
+        else:
+            negative_count += 1
+    
+    total_allergy_reviews_number = len(allergy_reviews)
+    if total_allergy_reviews_number > 0:
+        positive_proportion = positive_count/total_allergy_reviews_number
+    else:
+        positive_proportion == "Neutral"
+
+    return positive_proportion
