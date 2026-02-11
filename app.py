@@ -37,16 +37,41 @@ def switch_engine():
     return render_template('index.html', sem_show=sem_show, bool_tfidf_show=bool_tfidf_show,engine=engine)
 
 
+@app.route('/full_search', methods=['POST'])
+def search():
+    query = request.form.get('query', '')
+
+    documents, doc_embeddings = [], []
+    matches = dp.semantic_search(query, documents, doc_embeddings)
+    
+    matches_table = data[data.Name.isin(matches)]
+    matching_entries = list(json.loads(matches_table.T.to_json()).values())
+    print(matching_entries)
+
+    script, div, resources = dp.plot_freq(pd.DataFrame(matches_table), 'Rating (out of 6)')
+    
+    # Pass the search terms back to template
+    return render_template('index.html', 
+                         sem_show=sem_show, 
+                         bool_tfidf_show=bool_tfidf_show, 
+                         matches=matching_entries,
+                         engine=engine,
+                         chart_script = script,
+                         chart_div = div,
+                         chart_resources = resources,
+                         query=query)
+
+
 @app.route('/search', methods=['POST'])
 def search():
     query_yes = request.form.get('query_yes', '')
     query_no = request.form.get('query_no', '')
     query = request.form.get('query', '')
     
-    if engine == 'semantic':
-        matches = dp.semantic_search(query, documents, doc_embeddings)
-    elif engine in ('boolean', 'tf_idf'):
-        matches = dp.boolean_search(query_yes, query_no, documents) if engine == 'boolean' else dp.tf_idf_search(query_yes, query_no, documents)
+    if engine == 'boolean':
+        matches = dp.boolean_search(query_yes, query_no, documents)
+    elif engine == 'tf_idf':
+        matches = dp.tf_idf_search(query_yes, query_no, documents)
     else:
         return render_template('error.html', error_msg="Wrong search engine name or no search engine provided")
     

@@ -275,7 +275,7 @@
     <article>
         {% if sem_show %}
         <div id="semanticsearch">
-        <form action="/search" method="post">
+        <form action="/full_search" method="post">
             <!-- Update the input fields to preserve values -->
             <input type="text" name="query" placeholder="Describe your preferences" value="{{ query or '' }}">
         	<button type="submit">Search</button>

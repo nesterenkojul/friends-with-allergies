@@ -20,6 +20,24 @@ lemmatizer = nltk.wordnet.WordNetLemmatizer()
 N = 10  # How many top matches to show
 
 
+def dict_values_to_list(dictionary):
+    key_map = {}
+    val_list = []
+    idx = 0
+    for key, val in dictionary.items():
+        val_list.extend(val)
+        key_map[key] = (idx, idx + len(val))
+        idx = len(val)
+    return key_map, val_list
+
+
+def find_rest_for_idx(key_map, idx):
+    for key, borders in key_map.items():
+        if idx in range(*borders):
+            return key
+    return None
+
+
 def translate_chunk(chunk):
     try:
         transl_chunk = ts.translate_text(chunk, from_language='fi', to_language='en', translator='yandex')
@@ -77,7 +95,7 @@ def initialise_index():
     __location__ = os.path.realpath(os.path.join(os.getcwd(), os.path.dirname(__file__)))
     absolute_path = lambda x: os.path.join(__location__, x)
     data = pd.read_csv(absolute_path("data/restaurant_data.csv"), sep="\t", index_col=0)
-    reviews = pd.read_csv(absolute_path("data/translated_review_data.csv"), sep="\t", index_col=0)
+    reviews = pd.read_csv(absolute_path("data/translated_review_data.csv"), sep="\t", index_col=0, lineterminator='\n')
     menus = pd.read_csv(absolute_path("data/translated_menu_data.csv"), sep="\t", index_col=0)
     review_dict, menu_dict, embed_review_dict, embed_menu_dict = {}, {}, {}, {}
     for _, row in data.iterrows():
@@ -204,27 +222,51 @@ def tf_idf_search(query_yes, query_no, documents):
         fitting_restaurants.append(documents[doc_idx].split('\n')[0])
     return fitting_restaurants
 
+"""
+def semantic_search(query, doc_embeddings, threshold=0.25):
+    key_map, docs_list = dict_values_to_list(doc_embeddings)
 
-def semantic_search(query, documents, doc_embeddings,threshold=0.25):
     query_embedding = model.encode(query)
-    cosine_similarities = np.dot(query_embedding, doc_embeddings.T)
+    cosine_similarities = np.dot(query_embedding, docs_list)
     ranked_doc_indices = np.argsort(cosine_similarities)[::-1]
 
-    fitting_restaurants = []
     best_similarity = cosine_similarities[ranked_doc_indices[0]]
     if best_similarity < threshold:
         return []
-
-    for i in range(len(documents)):
+    
+    fitting_restaurants = set()
+    for i in range(len(docs_list)):
         if len(fitting_restaurants) >= N:
             break
         doc_idx = ranked_doc_indices[i]
         similarity = cosine_similarities[doc_idx]
         if similarity < threshold:
             break
-        fitting_restaurants.append(documents[doc_idx].split('\n')[0])
+        fitting_restaurants.add(find_rest_for_idx(key_map, doc_idx))
 
-    return fitting_restaurants
+    return list(fitting_restaurants)
+"""
+
+def semantic_search(query, doc_embeddings, threshold=0.25):
+    if query is None or doc_embeddings is None or doc_embeddings.shape == (0,):
+        return []
+    query_embedding = model.encode(query)
+    cosine_similarities = np.dot(query_embedding, doc_embeddings.T)
+    ranked_doc_indices = np.argsort(cosine_similarities)[::-1]
+
+    best_similarity = cosine_similarities[ranked_doc_indices[0]]
+    if best_similarity < threshold:
+        return []
+    
+    doc_ids = []
+    for i in range(len(doc_embeddings)):
+        doc_idx = ranked_doc_indices[i]
+        similarity = cosine_similarities[doc_idx]
+        if similarity < threshold:
+            break
+        doc_ids.append(doc_idx)
+
+    return doc_ids
 
 
 def sentiment_analysis(text):
@@ -233,9 +275,8 @@ def sentiment_analysis(text):
     return 1 if score >= 0 else 0
 
 
-def get_all_allergy_reviews(all_reviews,similarity_threshold=0.3):
+def get_all_allergy_reviews(all_reviews, embed_reviews, threshold=0.3):
     #Extract all allergy-related reviews from all the review of a restaurant and return them in a list
-    doc_embeddings = model.encode(all_reviews)
     allergy_query = """
     allergy allergic reaction anaphylaxis hypersensitivity
     gluten celiac
@@ -243,20 +284,16 @@ def get_all_allergy_reviews(all_reviews,similarity_threshold=0.3):
     food intolerance sensitivity dietary restrictions
     cross-contamination epinephrine EpiPen stomach ache, diarrhea """
 
-    allergy_reviews_with_scores = semantic_search(
-        query=allergy_query,
-        documents=all_reviews,
-        doc_embeddings=doc_embeddings,
-        similarity_threshold=similarity_threshold
-    )
-    allergy_reviews = [item['review'] for item in allergy_reviews_with_scores]
+    doc_ids = semantic_search(allergy_query, embed_reviews, threshold=threshold)
+    allergy_reviews = [all_reviews[i] for i in doc_ids]
+
     return allergy_reviews
 
 
-def allergy_reviews_analyser(all_reviews,similarity_threshold=0.3):
+def general_allergy_score(all_reviews, embed_reviews, threshold=0.3):
     # Classify the allergy reviews into positive or negative
     # => Calculate the proportion of positive/total allergy reviews => the larger this proportion, the better result
-    allergy_reviews = get_all_allergy_reviews(all_reviews,similarity_threshold)
+    allergy_reviews = get_all_allergy_reviews(all_reviews, embed_reviews, threshold)
 
     positive_count = 0
     negative_count = 0
@@ -272,7 +309,7 @@ def allergy_reviews_analyser(all_reviews,similarity_threshold=0.3):
     if total_allergy_reviews_number > 0:
         positive_proportion = positive_count/total_allergy_reviews_number
     else:
-        positive_proportion == "Neutral" # return "Neutral" if the reviews doesn't have any related to allergy
+        positive_proportion = "Neutral" # return "Neutral" if the reviews doesn't have any related to allergy
 
     return positive_proportion
 
@@ -283,3 +320,12 @@ def plot_freq(data, column):
     p.scatter(x, y)
     script, div = components(p)
     return script, div, CDN.render()
+
+
+if __name__ == "__main__":
+    data, review_dict, menu_dict, embed_review_dict, embed_menu_dict = initialise_index()
+    rest_allergy_scores = {}
+    for key in review_dict.keys():
+        score = general_allergy_score(review_dict[key], embed_review_dict[key])
+        rest_allergy_scores[key] = score
+    print(rest_allergy_scores)
