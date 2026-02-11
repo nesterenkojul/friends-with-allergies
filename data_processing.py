@@ -17,25 +17,6 @@ nltk.download('vader_lexicon')
 model = SentenceTransformer('all-MiniLM-L6-v2')
 sia = SentimentIntensityAnalyzer()
 lemmatizer = nltk.wordnet.WordNetLemmatizer()
-N = 10  # How many top matches to show
-
-
-def dict_values_to_list(dictionary):
-    key_map = {}
-    val_list = []
-    idx = 0
-    for key, val in dictionary.items():
-        val_list.extend(val)
-        key_map[key] = (idx, idx + len(val))
-        idx = len(val)
-    return key_map, val_list
-
-
-def find_rest_for_idx(key_map, idx):
-    for key, borders in key_map.items():
-        if idx in range(*borders):
-            return key
-    return None
 
 
 def translate_chunk(chunk):
@@ -147,24 +128,12 @@ def get_term_vector(term, t2i, td_matrix):
         return np.zeros(td_matrix.shape[1], dtype=bool)
 
 
-def boolean_search(query_yes, query_no, documents):
-    # to make it more robust when users only give one query.
-    if not (query_yes or query_no):
+def boolean_search(query, documents):
+    if not query:
         return []
-    if query_yes:
-        transl_query_yes = translate_chunk(query_yes)
-        lemmatized_query_yes = extract_lemmas(transl_query_yes)
-        rewritten_yes, min_ngram_size_yes, max_ngram_size_yes = rewrite_query(lemmatized_query_yes)
-        rewritten, min_ngram_size, max_ngram_size = rewritten_yes, min_ngram_size_yes, max_ngram_size_yes
-    if query_no:
-        transl_query_no = translate_chunk(query_no)
-        lemmatized_query_no = extract_lemmas(transl_query_no)
-        rewritten_no, min_ngram_size_no, max_ngram_size_no = rewrite_query(lemmatized_query_no)
-        rewritten, min_ngram_size, max_ngram_size = rewritten_no, min_ngram_size_no, max_ngram_size_no
-    if query_yes and query_no:
-        min_ngram_size = min(min_ngram_size_yes, min_ngram_size_no)
-        max_ngram_size = max(max_ngram_size_yes, max_ngram_size_no)
-        rewritten = f"({rewritten_yes}) & (1 - ({rewritten_no}))"
+    transl_query = translate_chunk(query)
+    lemmatized_query = extract_lemmas(transl_query)
+    rewritten, min_ngram_size, max_ngram_size = rewrite_query(lemmatized_query)
 
     cv = CountVectorizer(lowercase=True, binary=True, preprocessor=extract_lemmas, ngram_range=(min_ngram_size, max_ngram_size))
     sparse_matrix = cv.fit_transform(documents)
@@ -181,14 +150,12 @@ def boolean_search(query_yes, query_no, documents):
     })
     hits_vector = np.asarray(hits_vector).ravel().astype(bool)
     hits_list = np.where(hits_vector)[0]
-    shown = min(N,len(hits_list))
-    fitting_restaurants = []
-    for doc_idx in hits_list[:shown]:
-        fitting_restaurants.append(documents[doc_idx].split('\n')[0])
-    return fitting_restaurants
+    return hits_list
+ 
 
-
-def get_tf_idf_scores(query, documents):
+def tf_idf_search(query, documents):
+    if not query:
+        return []
     ngram_size = len(query.split())
     lemmatized_query = extract_lemmas(query)
 
@@ -198,54 +165,9 @@ def get_tf_idf_scores(query, documents):
     hits = np.dot(query_vec, tf_matrix) 
 
     doc_ids_and_scores = dict(zip(hits.nonzero()[1], np.array(hits[hits.nonzero()])[0]))
-    return doc_ids_and_scores
- 
+    doc_ids_and_scores = sorted(doc_ids_and_scores.items(), key=lambda x: -x[1])
+    return [pair[0] for pair in doc_ids_and_scores]
 
-def tf_idf_search(query_yes, query_no, documents):
-    # to make it more robust when users only give one query.
-    if not (query_yes or query_no):
-        return []
-    if query_yes:
-        ids_and_scores_yes = get_tf_idf_scores(query_yes, documents)
-    if query_no:
-        ids_and_scores_no = get_tf_idf_scores(query_no, documents)
-    if query_yes and query_no:
-        ids_and_scores = [(doc_idx, score - ids_and_scores_no.get(doc_idx, 0)) for (doc_idx, score) in ids_and_scores_yes.items()]
-        ids_and_scores = sorted(ids_and_scores, key=lambda x: -x[1])
-    elif query_yes:
-        ids_and_scores = sorted(ids_and_scores_yes.items(), key=lambda x: -x[1])
-    else:
-        ids_and_scores = sorted(ids_and_scores_no.items(), key=lambda x: x[1])
-
-    fitting_restaurants = []
-    for (doc_idx, score) in ids_and_scores[:N]:
-        fitting_restaurants.append(documents[doc_idx].split('\n')[0])
-    return fitting_restaurants
-
-"""
-def semantic_search(query, doc_embeddings, threshold=0.25):
-    key_map, docs_list = dict_values_to_list(doc_embeddings)
-
-    query_embedding = model.encode(query)
-    cosine_similarities = np.dot(query_embedding, docs_list)
-    ranked_doc_indices = np.argsort(cosine_similarities)[::-1]
-
-    best_similarity = cosine_similarities[ranked_doc_indices[0]]
-    if best_similarity < threshold:
-        return []
-    
-    fitting_restaurants = set()
-    for i in range(len(docs_list)):
-        if len(fitting_restaurants) >= N:
-            break
-        doc_idx = ranked_doc_indices[i]
-        similarity = cosine_similarities[doc_idx]
-        if similarity < threshold:
-            break
-        fitting_restaurants.add(find_rest_for_idx(key_map, doc_idx))
-
-    return list(fitting_restaurants)
-"""
 
 def semantic_search(query, doc_embeddings, threshold=0.25):
     if query is None or doc_embeddings is None or doc_embeddings.shape == (0,):
@@ -323,9 +245,4 @@ def plot_freq(data, column):
 
 
 if __name__ == "__main__":
-    data, review_dict, menu_dict, embed_review_dict, embed_menu_dict = initialise_index()
-    rest_allergy_scores = {}
-    for key in review_dict.keys():
-        score = general_allergy_score(review_dict[key], embed_review_dict[key])
-        rest_allergy_scores[key] = score
-    print(rest_allergy_scores)
+    pass

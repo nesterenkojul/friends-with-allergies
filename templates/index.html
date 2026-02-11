@@ -275,7 +275,7 @@
     <article>
         {% if sem_show %}
         <div id="semanticsearch">
-        <form action="/full_search" method="post">
+        <form action="/search_single" method="post">
             <!-- Update the input fields to preserve values -->
             <input type="text" name="query" placeholder="Describe your preferences" value="{{ query or '' }}">
         	<button type="submit">Search</button>
@@ -284,7 +284,7 @@
         {% endif %}
         {% if bool_tfidf_show %}
         <div id="boolean-tf-idf-search">
-        <form action="/search" method="post">
+        <form action="/search_double" method="post">
             <!-- Update the input fields to preserve values -->
             <input type="text" name="query_yes" placeholder="Green flag: I want this!" value="{{ query_yes or '' }}">
             <input type="text" name="query_no" placeholder="Red flag: Don't include!" value="{{ query_no or '' }}">

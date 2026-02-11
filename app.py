@@ -10,12 +10,15 @@ sem_show, bool_tfidf_show = True, False
 
 data = pd.DataFrame()
 review_dict, menu_dict, embed_review_dict, embed_menu_dict = {}, {}, {}, {}
+embed_compiled_documents = []
 
 
 @app.route('/')
 def init():
-    global data, review_dict, menu_dict, embed_review_dict, embed_menu_dict
+    global data, review_dict, menu_dict, embed_review_dict, embed_menu_dict, compiled_documents, embed_compiled_documents
     data, review_dict, menu_dict, embed_review_dict, embed_menu_dict = dp.initialise_index()
+    compiled_documents = ['\n'.join(menu_dict[key]) + '\n' + '\n'.join(review_dict[key]) for key in menu_dict.keys()]
+    embed_compiled_documents = dp.model.encode(compiled_documents)
     return render_template('index.html', engine=engine, sem_show=sem_show, bool_tfidf_show=bool_tfidf_show)
 
 
@@ -37,17 +40,45 @@ def switch_engine():
     return render_template('index.html', sem_show=sem_show, bool_tfidf_show=bool_tfidf_show,engine=engine)
 
 
-@app.route('/full_search', methods=['POST'])
-def search():
-    query = request.form.get('query', '')
-
-    documents, doc_embeddings = [], []
-    matches = dp.semantic_search(query, documents, doc_embeddings)
-    
-    matches_table = data[data.Name.isin(matches)]
+def doc_ids_to_data_entries(matched_docs):
+    matched_rests = [list(menu_dict.keys())[idx] for idx in matched_docs]
+    matches_table = data[data.Name.isin(matched_rests)].sort_values(by='Name', key=lambda col: [matched_rests.index(v) for v in col.values])
     matching_entries = list(json.loads(matches_table.T.to_json()).values())
-    print(matching_entries)
+    return matches_table, matching_entries
 
+
+def dict_values_to_list(dictionary):
+    key_map = {}
+    val_list = []
+    idx = 0
+    for key, val in dictionary.items():
+        val_list.extend(val)
+        key_map[key] = (idx, idx + len(val))
+        idx += len(val)
+    return key_map, val_list
+
+
+def find_rest_for_idx(key_map, idx):
+    for key, borders in key_map.items():
+        if idx in range(*borders):
+            return key
+    return None
+
+def get_matching_scores(key_map, matched_docs):
+    # Score is assigned according to how many dishes containing a query term have been found for a given restaurant
+    scores = {key: 0 for key in key_map.keys()}
+    for idx in matched_docs:
+        rest = find_rest_for_idx(key_map, idx)
+        scores[rest] += 1
+    return scores
+
+
+@app.route('/search_single', methods=['POST'])
+def search_single():
+    query = request.form.get('query', '')
+    matched_docs = dp.semantic_search(query, embed_compiled_documents, threshold=0.3)
+    matches_table, matching_entries = doc_ids_to_data_entries(matched_docs)
+    print(matching_entries)
     script, div, resources = dp.plot_freq(pd.DataFrame(matches_table), 'Rating (out of 6)')
     
     # Pass the search terms back to template
@@ -56,28 +87,34 @@ def search():
                          bool_tfidf_show=bool_tfidf_show, 
                          matches=matching_entries,
                          engine=engine,
-                         chart_script = script,
-                         chart_div = div,
-                         chart_resources = resources,
+                         chart_script=script,
+                         chart_div=div,
+                         chart_resources=resources,
                          query=query)
 
 
-@app.route('/search', methods=['POST'])
-def search():
+@app.route('/search_double', methods=['POST'])
+def search_double():
     query_yes = request.form.get('query_yes', '')
     query_no = request.form.get('query_no', '')
-    query = request.form.get('query', '')
+
+    # Green flag filtering
+    rest_to_dish_map, dishes_list = dict_values_to_list(menu_dict)
     
     if engine == 'boolean':
-        matches = dp.boolean_search(query_yes, query_no, documents)
+        matched_docs = dp.boolean_search(query_yes, dishes_list)
     elif engine == 'tf_idf':
-        matches = dp.tf_idf_search(query_yes, query_no, documents)
+        matched_docs = dp.tf_idf_search(query_yes, dishes_list)
     else:
         return render_template('error.html', error_msg="Wrong search engine name or no search engine provided")
     
-    matches_table = data[data.Name.isin(matches)]
-    matching_entries = list(json.loads(matches_table.T.to_json()).values())
-    print(matching_entries)
+    matching_scores = get_matching_scores(rest_to_dish_map, matched_docs)
+    matching_scores = [(key, val) for key, val in matching_scores.items() if val > 0]
+    matching_scores.sort(key=lambda x: -x[1])
+    matching_ids = [list(menu_dict.keys()).index(key) for key, _ in matching_scores]
+    matches_table, matching_entries = doc_ids_to_data_entries(matching_ids)
+
+    # Implement filtering for query_no here ...
 
     script, div, resources = dp.plot_freq(pd.DataFrame(matches_table), 'Rating (out of 6)')
     
@@ -91,8 +128,7 @@ def search():
                          chart_div = div,
                          chart_resources = resources,
                          query_yes=query_yes,
-                         query_no=query_no,
-                         query=query)
+                         query_no=query_no)
 
 
 
